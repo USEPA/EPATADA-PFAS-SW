@@ -25,7 +25,13 @@ Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, S. Cormier, and T.
 ## Included .R Files
 
 data_pull.R
+
 EPA_data_processing_SW_ONLY.R
+
+data_visualization.R
+
+EPA_data_processing.R
+
 
 ## Outline of data_pull.R: 
 
