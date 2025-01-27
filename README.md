@@ -12,7 +12,7 @@ Authors: Hannah Ferriby1, Kateri Salk1, Matt Dunn1, Christopher Wharton1, Susan 
 
 Affiliations: 1. Tetra Tech Inc. 2. United States Environmental Protection Agency 
 
-Corresponding Author: Tammy Newcomer-Johnson – newcomer-johnson.tammy@epa.gov 
+Corresponding Author: [Tammy Newcomer-Johnson](newcomer-johnson.tammy@epa.gov) 
 
 Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, S. Cormier, and T. Newcomer-Johnson. 2025. TADA-PFAS-SW. https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
 
