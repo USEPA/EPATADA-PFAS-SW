@@ -18,9 +18,9 @@ Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, S. Cormier, and T.
 
 # How to Use TADA-PFAS-SW
 
-Tools for Automated Data Analysis: https://usepa.github.io/EPATADA/index.html
+[Tools for Automated Data Analysis](https://usepa.github.io/EPATADA/index.html)
 
-Function Reference Glossary: https://usepa.github.io/EPATADA/reference/index.html
+[Function Reference Glossary](https://usepa.github.io/EPATADA/reference/index.html)
 
 ## Included .R Files
 
