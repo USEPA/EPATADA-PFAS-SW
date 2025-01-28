@@ -14,7 +14,7 @@ Affiliations: 1. Tetra Tech Inc. 2. United States Environmental Protection Agenc
 
 Corresponding Author: [Tammy Newcomer-Johnson](newcomer-johnson.tammy@epa.gov) 
 
-Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, S. Cormier, and T. Newcomer-Johnson. 2025. TADA-PFAS-SW. https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
+Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, S. Cormier, and T. Newcomer-Johnson. 2025. Water Quality Portal – Tools for Automated Data Analysis of PFAS in Surface Water (TADA-PFAS-SW). https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
 
 # How to Use TADA-PFAS-SW
 
