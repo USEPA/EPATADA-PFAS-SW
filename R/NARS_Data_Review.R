@@ -31,10 +31,7 @@ species_data <- read_xlsx('Data/NARS/final-nla-2022-pfas-public-release-file-8-1
 ###combine species data with concentration data, this is now concentration and species for each site
 #Convert NARS data to ng/kg
 combined_data <- left_join(data, species_data, by="EPA Sample ID") %>%
-  mutate(Amount = Amount * 1000, #ng/g to ng/kg
-         `Units 1` = 'ng/kg',
-         MDL = MDL * 1000,
-         QL = QL * 1000) %>%
+  mutate(`Units 1` = 'ug/kg') %>% #ng/g to ug/kg are equivalent
   select(!`Units 2`)
 
 ##count data 
@@ -76,17 +73,55 @@ Cwater_analysis <- combined_data_no_nd %>%
                                   Analyte == 'PFOS' ~
                                     Amount/(10^pfos_baf-pfos_baf_std),
                                   T ~ NA))
+####Water Plots####
 
+#####Boxplot#####
 #boxplot with limits
 #pfoa acute - 3100 ug/L
 #pfoa chronic - 100 ug/L
 #pfos acute - 71 ug/L
 #pfos chronic - 0.25 ug/L
 
-#scatterplot/line with std upper and lower
+#To make acute/chronic lines only appear over their specific analyte
+#Define thresholds per analyte
+thresholds <- data.frame(
+  Analyte = c("PFOA", "PFOA", "PFOS", "PFOS"),
+  Type = c("Acute", "Chronic", "Acute", "Chronic"),
+  Threshold = c(3100, 100, 71, 0.25)
+)
+
+# Map analyte names to x-axis positions
+thresholds$x <- as.numeric(factor(thresholds$Analyte))
+thresholds$xmin <- thresholds$x - 0.3  # boxplot default width is 0.6
+thresholds$xmax <- thresholds$x + 0.3
+
+ggplot() + 
+  geom_boxplot(data = Cwater_analysis, aes(x = Analyte, y = Cwater)) + 
+  geom_segment(data = thresholds,
+               aes(x = xmin, xend = xmax,
+                   y = Threshold, yend = Threshold,
+                   color = Type),
+               linetype = "dashed", size = 0.8) +
+  scale_y_log10() +
+  ylab('Water Concentration (ug/L)') +
+  theme_classic() +
+  scale_color_manual(name = 'Standard', values = c('#03a5fc', '#d10804'))
 
 
-####Plots####
+ggplot() + 
+  geom_boxplot(data = Cwater_analysis, aes(x = Analyte, y = Cwater*1000)) + 
+  geom_segment(data = thresholds,
+               aes(x = xmin, xend = xmax,
+                   y = Threshold*1000, yend = Threshold*1000,
+                   color = Type),
+               linetype = "dashed", size = 0.8) +
+  scale_y_log10(labels = scales::comma_format()) +
+  ylab('Water Concentration (ng/L)') +
+  theme_classic() +
+  scale_color_manual(name = 'Standard', values = c('#03a5fc', '#d10804'))
+
+
+####Exploratory Plots####
 
 #####Frequency#####
 freq_species_df <- as.data.frame(table(species_data$`Species - Scientific Name`))
