@@ -1,9 +1,12 @@
-#### initials NARS data review 
-###Matt Dunn 6/24/25
 
-library(EPATADA)
+####NARS data review & water concentration calculation
+
+#Written by: Matt Dunn (Tetra Tech) & Hannah Ferriby (Tetra Tech)
+#Date created: 6/24/25
+#Date updated: 7/9/25
+
 library(tidyverse)
-library(sf)
+library(readxl)
 library(ggplot2)
 library(scales)
 
@@ -11,38 +14,81 @@ library(scales)
 options(scipen=999) ### no scientific notation
 
 
-###Loading in data files 
+####Load Data####
+#concentration data 
+data <- read_xlsx('Data/NARS/final-nla-2022-pfas-public-release-file-8-19-24_0.xlsx') %>%
+  mutate(`EPA Sample ID` = as.factor(`EPA Sample ID`))
 
-data <- final_nla_2022_pfas_public_release_file_8_19_24_0 ### concentration data 
-
-
-species_data <- final_nla_2022_pfas_public_release_file_8_19_24_0_Species         ### fish info
-species_only <- final_nla_2022_pfas_public_release_file_8_19_24_0_Species_Only    ### species only
-
-data$`EPA Sample ID`<-as.factor(data$`EPA Sample ID`)
-species_only$`EPA Sample ID`<-as.factor(species_only$`EPA Sample ID`)
-species_data$`EPA Sample ID`<-as.factor(species_data$`EPA Sample ID`)
-
-
-species_data_unique <- species_data %>%
+#fish info
+species_data <- read_xlsx('Data/NARS/final-nla-2022-pfas-public-release-file-8-19-24_0_Species.xlsx') %>%
+  mutate(`EPA Sample ID` = as.factor(`EPA Sample ID`)) %>%
+  select(`EPA Sample ID`, Family, `Species - Scientific Name`, 
+         `Species - Common Name`) %>%
   distinct(`EPA Sample ID`, .keep_all=TRUE)
 
-species_data_unique
-
-species_data_unique$`EPA Sample ID` <- as.factor(species_data_unique$`EPA Sample ID`)
+####Join Datasets####
 
 ###combine species data with concentration data, this is now concentration and species for each site
+#Convert NARS data to ng/kg
+combined_data <- left_join(data, species_data, by="EPA Sample ID") %>%
+  mutate(Amount = Amount * 1000, #ng/g to ng/kg
+         `Units 1` = 'ng/kg',
+         MDL = MDL * 1000,
+         QL = QL * 1000) %>%
+  select(!`Units 2`)
 
-combined_data <- left_join(data, species_data_unique, by="EPA Sample ID")
-
-combined_data
-
-##count and plot species data 
-
+##count data 
 unique_count_species <- length(unique(species_data$`Species - Scientific Name`))
-unique_count_species
-#21 Species 
 
+
+####Analysis####
+#BAF = Cbiota / Cwater
+#BAF from Burkhard 2021
+#Cbiota from NARS
+#Solve for Cwater
+
+pfoa_baf <- 2.16 #L/kg
+pfoa_baf_std <- 0.85 #L/kg
+
+pfos_baf <- 3.55 #L/kg
+pfos_baf_std <- 0.83 #L/kg
+
+#Remove non-detects (nd) from dataset
+##2001 measurements left (2001/16520 = 87.8% were non detects, 12.2% were detects)
+combined_data_no_nd <- combined_data %>%
+  filter(!is.na(Amount)) %>%
+  filter(Analyte %in% c('PFOA', "PFOS"))
+
+
+Cwater_analysis <- combined_data_no_nd %>%
+  mutate(Cwater = case_when(Analyte == 'PFOA' ~
+                              Amount/(10^pfoa_baf), #ng/L
+                            Analyte == 'PFOS' ~
+                              Amount/(10^pfos_baf),
+                            T ~ NA),
+         Cwater_upper = case_when(Analyte == 'PFOA' ~
+                                    Amount/(10^(pfoa_baf+pfoa_baf_std)), #ng/L
+                                  Analyte == 'PFOS' ~
+                                    Amount/(10^pfos_baf+pfos_baf_std),
+                                  T ~ NA),
+         Cwater_lower = case_when(Analyte == 'PFOA' ~
+                                    Amount/(10^pfoa_baf-pfoa_baf_std), #ng/L
+                                  Analyte == 'PFOS' ~
+                                    Amount/(10^pfos_baf-pfos_baf_std),
+                                  T ~ NA))
+
+#boxplot with limits
+#pfoa acute - 3100 ug/L
+#pfoa chronic - 100 ug/L
+#pfos acute - 71 ug/L
+#pfos chronic - 0.25 ug/L
+
+#scatterplot/line with std upper and lower
+
+
+####Plots####
+
+#####Frequency#####
 freq_species_df <- as.data.frame(table(species_data$`Species - Scientific Name`))
 freq_name_df <- as.data.frame(table(species_data$`Species - Common Name`))
 
@@ -68,38 +114,27 @@ ggplot(freq_name_df, aes(x = Var1, y = Freq)) +
 
 
 
-##### concentration data summary 
-
-data
+#####Concentration#####
 unique_count <- length(unique(data$Analyte))
-unique_count
-### 40 different PFAS compounds in dataset 
-
 unique_values <- unique(data$Analyte)
-unique_values
-###created list of compounds 
-
 freq_table <- table(data$Analyte)
-freq_table
-###413 samples
 
 
-## remove NAs in analyte detection
-
-cleaned_data <- data[!is.na(data$Amount), ]
-cleaned_data
+cleaned_data <- data %>%
+  filter(!is.na(Amount))
 ##2001 measurements left (2001/16520 = 87.8% were non detects, 12.2% were detects)
+
+
 unique_count_clean <- length(unique(cleaned_data$Analyte))
-unique_count_clean
 ##24 compounds with actual data 
 
 ### remove NAs in analyte detection for combined data
 
-cleaned_data_combined <- combined_data[!is.na(combined_data$Amount), ]
-cleaned_data_combined
+cleaned_data_combined <- combined_data %>%
+  filter(!is.na(Amount))
 ##2001 measurements left (2001/16520 = 87.8% were non detects, 12.2% were detects)
+
 unique_count_clean <- length(unique(cleaned_data$Analyte))
-unique_count_clean
 ##24 compounds with actual data 
 
 unique_values_clean <- unique(cleaned_data$Analyte)
@@ -136,7 +171,6 @@ unique_sites_clean
 
 unique_states_clean <- unique(cleaned_data$State)
 unique_states_clean
-
 ###47 states (missing only Hawaii, Alaska, North Dakota)
 
 freq_table_cleaned_states <- table(cleaned_data$State)
@@ -152,14 +186,14 @@ ggplot(freq_state_df, aes(x = Var1, y = Freq)) +
   ylab("Frequency of Detection")+
   theme(axis.text.y = element_text(size =10))
 
-###stats by group
+#####Stats by group#####
 
 result <- cleaned_data %>%
   group_by(Analyte) %>%
   summarise(Mean = mean(Amount), Median = median(Amount), st.dev = sd(Amount))
 print(result)
 
-###box plot 
+#####Box Plot#####
 
 cleaned_data$Analyte <- as.factor(cleaned_data$Analyte)
 cleaned_data$Amount <- as.numeric(cleaned_data$Amount)
@@ -173,7 +207,7 @@ plots<- left_join(cleaned_data, functional_df, by="Analyte")
 
 
 
-p <- ggplot(plots, aes(x=Analyte, y=Amount, color=plots$Type))+ 
+p <- ggplot(plots, aes(x=Analyte, y=Amount, color=plots$Type, fill = plots$Type))+ 
   geom_boxplot(outlier.colour="black", outlier.shape=16,
                outlier.size=2, notch=FALSE)+
   scale_x_discrete(limits = c("PFMBA", "3:3 FTCA", "5:3 FTCA", "7:3 FTCA", "PFBA", "PFPeA", "PFHpA", "PFOA", "PFNA", "PFDA", "PFUnA", "PFDoA", "PFTrDA", "PFTeDA", "PFHxS", "PFHpS", "PFOS", "N-EtFOSE", "N-MeFOSAA", "N-EtFOSAA", "PFOSA", "PFNS", "PFDS", "PFDoS"))+
@@ -183,7 +217,8 @@ p <- ggplot(plots, aes(x=Analyte, y=Amount, color=plots$Type))+
   theme(axis.text.y = element_text(size =10))+
   ggtitle("Detectable Tissue Concentrations in Fish - 2022 (ppb)")+
   scale_y_log10()+
-  scale_color_manual('Group', values=c('brown', 'purple','green','orange','red','black','blue'))
+  scale_color_manual('Group', values=c('#A52A2A', '#720c99','darkgreen','#a76004','darkred','black','blue')) +
+  scale_fill_manual('Group', values = c('#A0522D', 'purple','green','orange','red','gray50','#5b8cf0'))
   
 p
 
