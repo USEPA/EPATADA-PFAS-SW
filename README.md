@@ -1,4 +1,4 @@
-# Welcome to TADA-PFAS-SW: Tools for Automated Data Analysis of PFAS in Surface Water!
+# Welcome to US EPA Data Discovery Tool-PFAS!
 
 This is a quality assurance procedure for cleaning up Per- and polyfluoroalkyl substances (PFAS) surface water concentration data and can be adapted for other variables.
 
@@ -14,7 +14,7 @@ Affiliations: 1. Tetra Tech Inc. 2. United States Environmental Protection Agenc
 
 Corresponding Author: [Tammy Newcomer-Johnson](newcomer-johnson.tammy@epa.gov) 
 
-Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, and T. Newcomer-Johnson. 2025. US EPA Water Quality Portal – Tools for Automated Data Analysis of PFAS in Surface Water (TADA-PFAS-SW). https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
+Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, and T. Newcomer-Johnson. 2025. US EPA Data Discovery Tool-PFAS. https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
 
 # How to Use TADA-PFAS-SW
 
@@ -26,11 +26,11 @@ Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, and T. Newcomer-Jo
 
 data_pull.R
 
-EPA_data_processing_SW_ONLY.R
+data_processing.R
 
 data_visualization.R
 
-EPA_data_processing.R
+NARS_Data_Review.R
 
 
 ## Outline of data_pull.R: 
