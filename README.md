@@ -71,10 +71,10 @@ NARS_Data_Review.R
 -	Data Import: PFAS dataset from data pull (data_export.csv) imported.
 -	Change characteristicName to figure-friendly abbreviations.
 ### 2.	 Harmonize state name, location, and state codes 
--	Load state codes: state_codes.txt 
+-	Load state codes: (state_codes.txt)
 -	Load in shape file (.shp) of United States for later plotting 
 ### 3.	Filter Data for PFAS Compounds: Pull only samples we can identify as surface water and tissue for the pre-selected PFAS
--	Filter by Media and MediaSubdivisionName: Retain only records from surface water samples and tissue samples.
+-	Filter by (Media) and (MediaSubdivisionName): Retain only records from surface water samples and tissue samples.
 -	Filter by Compound: Ensure samples are from a predefined list of PFAS compounds (perfluorooctanoic acid and perfluorooctanesulfonate).
 -	Harmonize Names: Abbreviate specific PFAS compound names for consistency.
 ### 4.	 Preparing Initial Summary Maps with Unfiltered Data 
