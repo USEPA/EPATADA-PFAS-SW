@@ -16,7 +16,9 @@ Corresponding Author: [Tammy Newcomer-Johnson](newcomer-johnson.tammy@epa.gov)
 
 Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, and T. Newcomer-Johnson. 2025. US EPA Data Discovery Tool-PFAS. https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
 
-# EPATADA Reference Sites
+# How to use US EPA Data Discovery Tool-PFAS
+
+## EPATADA Reference Sites
 
 [Tools for Automated Data Analysis](https://usepa.github.io/EPATADA/index.html)
 
