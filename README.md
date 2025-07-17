@@ -1,6 +1,6 @@
-# Welcome to TADA-PFAS-SW: Tools for Automated Data Analysis of PFAS in Surface Water!
+# Welcome to US EPA Data Discovery Tool-PFAS: semi-automated data-extraction of PFAS in surface water.
 
-This is a quality assurance procedure for cleaning up Per- and polyfluoroalkyl substances (PFAS) surface water concentration data and can be adapted for other variables.
+This is a quality assurance procedure for cleaning up per- and polyfluoroalkyl substances (PFAS) surface water concentration data and can be adapted for other variables.
 
 ## Purpose
 
