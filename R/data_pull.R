@@ -1,121 +1,217 @@
 #PFAS Data Pull
-#Following instructions outlined by Matt Dunn in 
+#Following instructions outlined by Matt Dunn in
 #notebook entry from 2025-04-23
 
 #Written by: Hannah Ferriby, hannah.ferriby@tetratech.com
 #Date created: 2025-5-2
 #Date updated: 2025-5-29
 
+# Packages ---------------------------------------------------------------
 
-####Set Up####
-library(EPATADA)
-library(tidyverse)
-library(sf)
-library(ggplot2)
-library(scales)
-library(scatterpie)
+{
+  packages <- c(
+    'tidyverse',
+    'sf',
+    'scales',
+    'scatterpie',
+    # ! NOTE Suggests for better experience
+    'here',
+    'geofacet',
+    #'tigris',
+    'ggforce',
+    'ggdist',
+    'remotes'
+  )
 
-####Download####
-data <- TADA_DataRetrieval(characteristicName = c('PFOA ion'
-                                                  , 'Perfluorooctanoic acid'
-                                                  # , 'PERFLUOROOCTANOIC ACID'
-                                                  ,'Perfluorooctanesulfonate'
-                                                  , 'Perfluorooctane sulfonic acid'
-                                                  # , 'Potassium perfluorooctanesulfonate'
-                                                  , 'Perfluorooctanesulfonate (PFOS)'
-                                                  # , 'POTASSIUM PERFLUOROOCTANESULFONATE'
-                                                  ),
-                           # sampleMedia = c('Water', 'Tissue'), 
-                           applyautoclean = T,
-                           ask = F)
+  # Loop through each package
+  for (package in packages) {
+    # Check if the package is installed
+    if (!requireNamespace(package, quietly = TRUE)) {
+      # If not installed, install the package
+      install.packages(package)
+    }
+    # Load the package
+    library(package, character.only = TRUE)
+  }
+
+packages <- c('EPATADA')
+
+for(packages in packages) {
+  if (!requireNamespace(packages, quietly = TRUE)) {
+    # If not installed, install the package
+    remotes::install_github(paste0("USEPA/", packages),
+      ref = "develop",
+    dependencies = TRUE,
+    force = TRUE
+)
+  }
+  # Load the package
+  library(packages, character.only = TRUE)
+}
+
+  rm(packages, package)
+}
 
 
-####Export####
-write_csv(data, 'output/data_pull.csv')
+# Download ---------------------------------------------------------------
 
-####MAPS####
-state_num <- read.table('data/state_codes.txt', header = T, sep = "|", dec = ".") %>%
-  mutate(STATE = ifelse(STATE < 10, as.character(paste0('0',STATE)),
-                        as.character(STATE)))
+data <- TADA_DataRetrieval(
+  characteristicName = c(
+    'PFOA ion',
+    'Perfluorooctanoic acid',
+    # , 'PERFLUOROOCTANOIC ACID'
+    'Perfluorooctanesulfonate',
+    'Perfluorooctane sulfonic acid',
+    # , 'Potassium perfluorooctanesulfonate'
+    'Perfluorooctanesulfonate (PFOS)'
+    # , 'POTASSIUM PERFLUOROOCTANESULFONATE'
+  ),
+  # sampleMedia = c('Water', 'Tissue'),
+  applyautoclean = T,
+  ask = F
+)
 
-states <- st_read('data/cb_2018_us_state_500k/cb_2018_us_state_500k.shp') %>%
-  filter(!STATEFP %in% c('60', '66', '69', '78',
-                         '15', '02'))
+# Export of raw ----------------------------------------------------------
 
-all_data_all_media <- data %>%
-  left_join(state_num, by = c('StateCode' = 'STATE'))
+write_csv(data, here('output','data_pull.csv'))
 
-states_w_data <- all_data_all_media %>%
-  group_by(STATE_NAME) %>%
+
+# Spatial ----------------------------------------------------------------
+
+state_num <- read.table(
+  here('data', 'state_codes.txt'),
+  header = T,
+  sep = "|",
+  dec = ".",
+  # Imports as character to avoid issues with leading zeros in state codes
+  colClasses = "character"
+)  %>% 
+  select(STATE_NAME, STATE, STUSAB) %>% 
+  # ! NOTE: Needed for geofacet to work properly
+  mutate(
+    STATE_NAME = case_when(
+      STUSAB == 'MP' ~ "Northern Mariana Isl",
+      STUSAB == 'VI' ~ "US Virgin Islands",
+      .default = STATE_NAME
+  )
+) %>% 
+  rename(
+    state_name = STATE_NAME,
+    state_code = STATE,
+    state_abb = STUSAB
+  )
+
+# ? May not even be needed. 
+# states <- tigris::states(year = 2018, resolution = "500k") %>%
+#   # ! NOTE: Needed for geofacet to work properly
+#   mutate(
+#     NAME = case_when(
+#       STUSPS == 'MP' ~ "Northern Mariana Isl",
+#       STUSPS == 'VI' ~ "US Virgin Islands",
+#       .default = NAME
+#     )
+#   )
+
+# Cleaning ---------------------------------------------------------------
+
+states_w_data <-  data %>%
+  left_join(., state_num, join_by('StateCode' == 'state_code'))
+  group_by(state_name) %>%
   mutate(n_samples_total = n()) %>%
   ungroup() %>%
-  group_by(STATE_NAME, ActivityMediaName) %>%
-  reframe(STATE_NAME = STATE_NAME, 
-          ActivityMediaName = ActivityMediaName,
-          n_samples_media_type = n(),
-          n_samples_total = n_samples_total) %>%
+  group_by(state_name, ActivityMediaName) %>%
+  reframe(
+    state_name = state_name,
+    #StateCode = StateCode,
+    ActivityMediaName = ActivityMediaName,
+    n_samples_media_type = n(),
+    n_samples_total = n_samples_total
+  ) %>%
   unique() %>%
-  left_join(states, by = c('STATE_NAME'= 'NAME')) %>%
-  mutate(centroid = st_centroid(geometry)) %>%
-  select(STATE_NAME, ActivityMediaName, n_samples_total, n_samples_media_type,
-         centroid, geometry) 
+  select(
+    state_name,
+    ActivityMediaName,
+    n_samples_total,
+    n_samples_media_type
+  )
 
+# Plotting data ----------------------------------------------------------
 
-#####Scatterpie#####
-filt_pie <- states_w_data %>%
-  select(STATE_NAME, ActivityMediaName, n_samples_media_type,
-         n_samples_total, centroid, geometry) %>%
-  pivot_wider(id_cols = c('STATE_NAME', 'n_samples_total', 'centroid', 'geometry'),
-              names_from = 'ActivityMediaName',
-              values_from = 'n_samples_media_type') %>%
-  mutate(Tissue = ifelse(is.na(Tissue),0,Tissue),
-         Sediment = ifelse(is.na(Sediment),0,Sediment),
-         Soil = ifelse(is.na(Soil),0,Soil),
-         Water = ifelse(is.na(Water),0,Water),
-         Air = ifelse(is.na(Air),0,Air),
-         Other = ifelse(is.na(Other),0,Other)) %>%
-  st_drop_geometry()
+plot_data <- states_w_data %>%
+  # Pivot the data from long to wide format
+  pivot_wider(
+    id_cols = c('state_name', 'n_samples_total'), # Columns to keep as identifiers
+    names_from = 'ActivityMediaName', # Column whose values will become new column names
+    values_from = 'n_samples_media_type', # Column whose values will populate the new columns
+    values_fill = NA # Fill missing values with 0
+  ) %>% 
+  pivot_longer(
+    cols = -c(state_name, n_samples_total), # Columns to keep as identifiers
+    names_to = 'media', # New column for the names of the previous columns
+    values_to = 'n' # New column for the values of the previous columns
+  ) %>%
+  mutate(
+    media = case_when(
+      media == 'Biological Tissue' ~ 'Tissue',
+      TRUE ~ media # Keep other values as they are
+    ),
+    media = factor(
+      media,
+      levels = c(
+        "Water",
+        "Sediment",
+        "Soil",
+        "Air",
+        "Tissue",
+        "Other"
+      )
+    )
+  )
 
-filt_pie2 <- extract(filt_pie, centroid, into = c('Lat', 'Lon'), '\\((.*),(.*)\\)', conv = T) %>%
-  filter(!is.na(Lat)) %>%
-  rename(`All Water` = Water) %>%
-  mutate(radius = sqrt(n_samples_total)/25)
+{
+  p1 <- plot_data %>%
+    # ! NOTE Removes state that doesn't have a name?
+    # TODO Follow up why this is happening
+    filter(!is.na(state_name) & !is.na(n)) %>%
+    ggplot() +
+    geom_bar(
+      aes(x = media, y = n, fill = media),
+      stat = 'identity'
+    ) +
+    scale_y_log10(limits = c(1, 10000), labels = waiver()) +
+    scale_fill_viridis_d(
+      name = 'Media',
+      #option = 'D' #viridis
+      option = 'H' #turbo
+    ) +
+    theme(
+      panel.background = element_rect(fill = 'white', color = 'white'),
+      panel.border = element_rect(color = 'black', fill = NA),
+      panel.spacing = unit(2, "lines"),
+      panel.grid.major.y = element_line(colour = "grey"),
+      strip.background = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.text.x = element_text(angle = 90, hjust = 1), # Rotate x-axis text for better readability
+    ) + #facet_wrap('state_name')
+  
+    facet_geo(
+      ~state_name,
+      grid = "us_states_territories_grid2",
+      label = "name",
+      move_axes = TRUE
+    )
 
+  p1
 
-
-ggplot() +
-  geom_sf(data = states, color = 'black', fill = 'gray90') +
-  geom_scatterpie(data = as.data.frame(filt_pie2), 
-                  aes(x = Lat, y = Lon, group = STATE_NAME, r = radius), 
-                  cols = c("Tissue", "All Water", "Sediment", "Air", "Soil", "Other"),
-                  color = 'black', size = 0.1) +
-  theme_bw() +
-  scale_fill_manual(name = 'Media Type',
-                    values = c(
-                      "Tissue" = "#FF9999",   # Light red
-                      "All Water" = "#99CCFF",    # Light blue
-                      "Sediment" = "#FFCC99", # Light orange
-                      "Air" = "#CCCC99",      # Light olive
-                      "Soil" = "#99CC99",     # Light green
-                      "Other" = "#CC99CC"     # Light purple
-                    )) +
-  xlab('')+
-  ylab('')+
-  theme(legend.position = 'top',
-        legend.text = element_text(size = 8),    # Reduces legend text size
-        legend.title = element_text(size = 8),   # Reduces legend title text size
-        legend.key.size = unit(0.5, "lines"),
-        axis.text = element_text(size = 8)) +
-  guides(fill = guide_legend(override.aes = list(size = 0.5))) + 
-  geom_scatterpie_legend(radius = filt_pie2$radius,
-                         x=-120, y=20
-                         , labeller=function(h) ((h*25)^2),
-                         n = 5, 
-                         breaks = c(0.4,
-                                    0.8944271909999159,
-                                    1.264911064067352,
-                                    2.82842712474619,
-                                    4),
-                         size = 3)
-
-ggsave('output/figures/scatterpie_map_all_media.jpg', units = 'in', width = 6, height = 6, dpi = 500)
+  ggsave(
+    p1,
+    filename = here('output', 'pfas_by_state_p1.png'),
+    width = 20,
+    height = 12.5,
+    units = 'in',
+    dpi = 500,
+    bg = 'white',
+    limitsize = FALSE
+  )
+}
