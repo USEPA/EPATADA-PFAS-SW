@@ -4,7 +4,7 @@ This is a quality assurance procedure for cleaning up per- and polyfluoroalkyl s
 
 ## Purpose
 
-The purpose of this document is to provide an order and general description of the steps taken to access, download, clean, and tag PFAS surface water data supplied by the US EPA’s Water Quality Portal. This document demonstrates the use of the R package ["EPATADA"](https://usepa.github.io/EPATADA/index.html) to assist with coding processes used to generate the results of a nationwide study of ambient surface water PFAS concentrations in the US. The code, data, and supporting documentation are all available free of charge. The document is broken down into sections that outline how each attached .R file can be used sequentially to evaluate surface water data in a reproducible manner. 
+The purpose of this document is to provide an order and general description of the steps taken to access, download, clean, and tag PFAS surface water data supplied by the US EPA’s Water Quality Portal. This document demonstrates the use of the R package "EPATADA" to assist with coding processes used to generate the results of a nationwide study of ambient surface water PFAS concentrations in the US. The code, data, and supporting documentation are all available free of charge. The document is broken down into sections that outline how each attached .R file can be used sequentially to evaluate surface water data in a reproducible manner.
 
 ## Authors and Affiliations
 
@@ -16,7 +16,7 @@ Corresponding Author: [Tammy Newcomer-Johnson](newcomer-johnson.tammy@epa.gov)
 
 Preferred citation: H. Ferriby, K. Salk, M. Dunn, C. Wharton, S. Cormier, and T. Newcomer-Johnson. 2025. US EPA Water Quality Portal – Tools for Automated Data Analysis of PFAS in Surface Water (TADA-PFAS-SW). https://github.com/TammyNewcomerJohnson/EPATADA-PFAS-SW
 
-# How to Use TADA-PFAS-SW
+# How to Use Data Discovery Tool-PFAS
 
 [Tools for Automated Data Analysis](https://usepa.github.io/EPATADA/index.html)
 
