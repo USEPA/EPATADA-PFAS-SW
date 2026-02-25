@@ -6,14 +6,29 @@
 #Date created: 2025-5-2
 #Date updated: 2025-5-29
 
+# if(!"remotes"%in%installed.packages()){
+#   install.packages("remotes")
+# }
+# library(remotes)
+# remotes::install_github("USEPA/EPATADA", ref = "develop", dependencies = TRUE, force = TRUE)
 
 ####Set Up####
 library(EPATADA)
+library(here)
 library(tidyverse)
 library(sf)
 library(ggplot2)
 library(scales)
 library(scatterpie)
+library(fs)
+
+#Check if the directories exists; create it if it doesn't
+if (!dir_exists("output")) {
+  dir_create("output")
+}
+if (!dir_exists("output/figures")) {
+  dir_create("output")
+}
 
 ####Download####
 data <- TADA_DataRetrieval(characteristicName = c('PFOA ion'
@@ -31,20 +46,24 @@ data <- TADA_DataRetrieval(characteristicName = c('PFOA ion'
 
 
 ####Export####
-write_csv(data, 'output/data_pull.csv')
+write_csv(data, here::here('output/data_pull.csv'))
 
 ####MAPS####
-state_num <- read.table('data/state_codes.txt', header = T, sep = "|", dec = ".") %>%
+#read in state codes and formats STATE column entries so that this can be joined
+state_num <- read.table(here::here('Data/state_codes.txt'), header = T, sep = "|", dec = ".") %>%
   mutate(STATE = ifelse(STATE < 10, as.character(paste0('0',STATE)),
                         as.character(STATE)))
 
-states <- st_read('data/cb_2018_us_state_500k/cb_2018_us_state_500k.shp') %>%
+#read in state shapefile - remove US territories, Alaska, Hawaii, and Puerto Rico
+states <- st_read(here::here('Data/cb_2018_us_state_500k/cb_2018_us_state_500k.shp')) %>%
   filter(!STATEFP %in% c('60', '66', '69', '78',
                          '15', '02'))
 
+#The scatterpie map does not take into consideration the type of PFAS compound
 all_data_all_media <- data %>%
   left_join(state_num, by = c('StateCode' = 'STATE'))
 
+#Group data by state to calculate total number of samples
 states_w_data <- all_data_all_media %>%
   group_by(STATE_NAME) %>%
   mutate(n_samples_total = n()) %>%
@@ -55,6 +74,7 @@ states_w_data <- all_data_all_media %>%
           n_samples_media_type = n(),
           n_samples_total = n_samples_total) %>%
   unique() %>%
+  #join sample counts with state shapes
   left_join(states, by = c('STATE_NAME'= 'NAME')) %>%
   mutate(centroid = st_centroid(geometry)) %>%
   select(STATE_NAME, ActivityMediaName, n_samples_total, n_samples_media_type,
@@ -118,4 +138,4 @@ ggplot() +
                                     4),
                          size = 3)
 
-ggsave('output/figures/scatterpie_map_all_media.jpg', units = 'in', width = 6, height = 6, dpi = 500)
+ggsave(here::here('output/figures/scatterpie_map_all_media.jpg'), units = 'in', width = 6, height = 6, dpi = 500)

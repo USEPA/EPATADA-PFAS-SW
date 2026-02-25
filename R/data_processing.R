@@ -5,17 +5,33 @@
 #Date created: 2025-5-6
 #Date updated: 2025-5-29
 
+# if(!"remotes"%in%installed.packages()){
+#   install.packages("remotes")
+# }
+# library(remotes)
+# remotes::install_github("USEPA/EPATADA", ref = "develop", dependencies = TRUE, force = TRUE)
+
 
 ####Set Up####
 library(EPATADA)
+library(here)
 library(tidyverse)
 library(sf)
 library(ggplot2)
 library(scales)
 library(scatterpie)
+library(fs)
+
+#Check if the directories exists; create it if it doesn't
+if (!dir_exists("output")) {
+  dir_create("output")
+}
+if (!dir_exists("output/figures")) {
+  dir_create("output")
+}
 
 ####Data####
-data <- read_csv('output/data_pull.csv') %>%
+data <- read_csv(here::here('output/data_pull.csv')) %>%
   mutate(Abbrev.Name = case_when(TADA.CharacteristicName == "PERFLUOROOCTANOIC ACID" ~ "PFOA",
                                  TADA.CharacteristicName == "PFOA ION" ~ "PFOA",
                                  TADA.CharacteristicName == "PERFLUOROOCTANESULFONATE (PFOS)" ~ "PFOS",
@@ -28,11 +44,11 @@ data_media_sums <- data %>%
           n = n()) %>%
   unique()
 
-state_num <- read.table('data/state_codes.txt', header = T, sep = "|", dec = ".") %>%
+state_num <- read.table(here::here('Data/state_codes.txt'), header = T, sep = "|", dec = ".") %>%
   mutate(STATE = ifelse(STATE < 10, as.character(paste0('0',STATE)),
                         as.character(STATE)))
 
-states <- st_read('data/cb_2018_us_state_500k/cb_2018_us_state_500k.shp') %>%
+states <- st_read(here::here('Data/cb_2018_us_state_500k/cb_2018_us_state_500k.shp')) %>%
   filter(!STATEFP %in% c('60', '66', '69', '78',
                          '15', '02'))
 
@@ -121,7 +137,7 @@ ggplot() +
                          size = 3)
 
 
-ggsave('output/figures/scatterpie_map_water_tissue.jpg', units = 'in', width = 6, height = 6, dpi = 500)
+ggsave(here::here('output/figures/scatterpie_map_water_tissue.jpg'), units = 'in', width = 6, height = 6, dpi = 500)
 
 ####Data Processing####
 #####1. Check Result Unit Validity#####
@@ -149,6 +165,7 @@ summary(as.factor(data_3$TADA.MethodSpeciation.Flag))
 # TADA.FractionAssumptions       
 # TADA.Harmonized.Flag
 data_4 <- TADA_HarmonizeSynonyms(data_3)
+summary(as.factor(data_4$TADA.Harmonized.Flag))
 
 #####5. Flag unrealistic values#####
 # This function adds the TADA.ResultValueAboveUpperThreshold.Flag to the dataframe.
@@ -234,6 +251,7 @@ data_13 <- data_12 %>%
   select(where(~sum(!is.na(.x)) > 0)) 
 
 #####Negative Values#####
+#Flag any samples that are below 0
 data_14 <- data_13 %>%
   mutate(negative_value_flag = ifelse(TADA.ResultMeasureValue >= 0, 'PASS',
                                       'FAIL'))
@@ -241,6 +259,7 @@ data_14 <- data_13 %>%
 summary(as.factor(data_14$negative_value_flag))
 
 #####Result Detection Name####
+#Flag any samples with 'Non-Detect' 
 detection_keynames <- data_14 %>%
   select(ResultDetectionConditionText) %>%
   unique()
@@ -253,6 +272,7 @@ data_15 <- data_14 %>%
 summary(as.factor(data_15$result_dection_name_flag))
 
 #####Detection Limit Units#####
+#convert all detection limit units to ng/L for best analysis
 units <- data_15 %>%
   select(TADA.DetectionQuantitationLimitMeasure.MeasureUnitCode) %>%
   unique()
@@ -273,13 +293,16 @@ data_16 <- data_15 %>%
                                            T ~ TADA.DetectionQuantitationLimitMeasure.MeasureUnitCode))
 
 
-
+#check
 units_post <- data_16 %>%
   select(detection_limit_units) %>%
   unique()
 
 
 #####Detection Limit Statistics#####
+#Calculate the distribution of detection limits by Characteristic, 
+# activity media, and detection limit units (mean, median, min, max, sd)
+#Warning is irrelevant since it is for samples without detection limit units
 detect_summary <- data_16 %>%
   group_by(TADA.CharacteristicName, TADA.ActivityMediaName, detection_limit_units) %>%
   reframe(TADA.CharacteristicName = TADA.CharacteristicName,
@@ -293,6 +316,7 @@ detect_summary <- data_16 %>%
   unique() %>%
   filter(!is.na(detection_limit_units))
 
+#Add a flag if the detection limit is greater than 2*std+avg or 2*std+median
 data_17 <- data_16 %>%
   left_join(detect_summary, by = c('TADA.CharacteristicName',
                                    'TADA.ActivityMediaName',
@@ -318,6 +342,7 @@ summary(as.factor(data_17$sample_lower_than_detection_limit_flag))
 
 
 #####EPA Methods#####
+#Add flag if a reported method is not an EPA method
 data_18 <- data_17 %>%
   mutate(EPA_method_flag = case_when(ResultAnalyticalMethod.MethodDescriptionText == 'EPA Method 537.1' &
                                        ResultAnalyticalMethod.MethodIdentifier == 'LM113' ~
@@ -347,7 +372,7 @@ summary(as.factor(data_18$EPA_method_flag))
 summary(data_18$TADA.DetectionQuantitationLimitMeasure.MeasureValue)
 
 ####Export data with flags####
-write_csv(data_18, 'output/EPATADA_Original_data_with_flags_tags.csv')
+write_csv(data_18, here::here('output/EPATADA_Original_data_with_flags_tags.csv'))
 
 #Find non-detect detection limit range
 summary(subset(data_18$TADA.DetectionQuantitationLimitMeasure.MeasureValue,
@@ -382,7 +407,7 @@ samples_filtered <- data_18 %>%
   filter(TADA.MeasureQualifierCode.Flag != 'Suspect' | is.na(TADA.MeasureQualifierCode.Flag))
 
 #Export filtered data
-write_csv(samples_filtered, 'output/EPATADA_priority_filtered_data.csv')
+write_csv(samples_filtered, here::here('output/EPATADA_priority_filtered_data.csv'))
 
 
 ####Filtered Map####
@@ -453,4 +478,4 @@ ggplot() +
                          size = 3)
 
 
-ggsave('output/figures/scatterpie_map_water_tissue_filtered.jpg', units = 'in', width = 6, height = 6, dpi = 500)
+ggsave(here::here('output/figures/scatterpie_map_water_tissue_filtered.jpg'), units = 'in', width = 6, height = 6, dpi = 500)

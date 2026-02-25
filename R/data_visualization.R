@@ -4,22 +4,37 @@
 #Date created: 2025-5-6
 #Date updated: 2025-5-29
 
+# install.package('scales')
+
 ####Libraries####
 library(tidyverse)
 library(sf)
 library(ggplot2)
 library(scales)
 library(ggpmisc)
+library(here)
+library(fs)
+
+#Check if the directories exists; create it if it doesn't
+if (!dir_exists("output")) {
+  dir_create("output")
+}
+if (!dir_exists("output/figures")) {
+  dir_create("output")
+}
 
 theme_set(theme_classic())
 options(scipen = 8)
 
 ####Data####
-state_num <- read.table('data/state_codes.txt', header = T, sep = "|", dec = ".") %>%
+state_num <- read.table('Data/state_codes.txt', header = T, sep = "|", dec = ".") %>%
   mutate(STATE = ifelse(STATE < 10, as.character(paste0('0',STATE)),
                         as.character(STATE)))
 
-all_data <- read_csv('output/EPATADA_Original_data_with_flags_tags.csv') %>%
+all_data <- read_csv('output/EPATADA_Original_data_with_flags_tags.csv',
+                     col_types = cols(FormationTypeText = col_character(),
+                                      AquiferName = col_character(),
+                                      ProjectFileUrl = col_character())) %>%
   left_join(state_num, by = c('StateCode' = 'STATE')) %>%
   mutate(TADA.ResultMeasure.MeasureUnitCode = ifelse(TADA.ResultMeasure.MeasureUnitCode == 'NG/ML',
                                                      'UG/L', TADA.ResultMeasure.MeasureUnitCode),
@@ -57,7 +72,10 @@ summary(all_data$TADA.DetectionQuantitationLimitMeasure.MeasureValue)
 summary(all_data$TADA.DetectionQuantitationLimitMeasure.MeasureValue[all_data$TADA.CensoredData.Flag == "Non-Detect"])
 summary(as.factor(all_data$TADA.CensoredData.Flag))
 
-filtered_data <- read_csv('output/EPATADA_priority_filtered_data.csv') %>%
+filtered_data <- read_csv('output/EPATADA_priority_filtered_data.csv',
+                          col_types = cols(FormationTypeText = col_character(),
+                                           AquiferName = col_character(),
+                                           ProjectFileUrl = col_character())) %>%
   mutate(StateCode = as.character(StateCode)) %>%
   left_join(state_num, by = c('StateCode' = 'STATE')) %>%
   mutate(Abbrev.Name = case_when(TADA.CharacteristicName == "PERFLUOROOCTANOIC ACID" ~ "PFOA",
@@ -100,7 +118,7 @@ data_summary_surfacewater <- filtered_data %>%
 
 sum(data_summary_surfacewater$count)
 
-write_csv(data_summary_surfacewater, 'output/figures/data_summary.csv')
+write_csv(data_summary_surfacewater, 'output/data_summary.csv')
 
 ####Summaries####
 #####Total Samples by Compound#####
@@ -139,8 +157,6 @@ exceedance <- all_data %>%
           exceedance_chronic_perc = sum(exceedance_flag_chronic)/count_uncensored * 100) %>%
   unique()
 
-pfos_exceed <- all_data %>%
-  filter(Abbrev.Name == 'PFOA'& TADA.ResultMeasureValue >= 100)
 
 
 data_summary_surfacewater_exceed <- data_summary_surfacewater %>%
@@ -155,6 +171,7 @@ samples_epa_region_flagged <- all_data %>%
   select(Abbrev.Name, TADA.ResultMeasureValue,
          TADA.ResultMeasure.MeasureUnitCode, STATE_NAME) %>%
   filter(!is.na(STATE_NAME)) %>%
+  #assign epa region
   mutate(EPA_Region = case_when(STATE_NAME %in% c('Maine', 'New Hampshire', 'Vermont',
                                                   'Massachusetts', 'Rhode Island',
                                                   'Connecticut') ~
@@ -190,6 +207,7 @@ samples_epa_region_flagged <- all_data %>%
                                                   'Alaska') ~
                                   '10',
                                 T ~ NA)) %>%
+  #calculate summary stats by region
   group_by(EPA_Region, Abbrev.Name, TADA.ResultMeasure.MeasureUnitCode) %>%
   reframe(EPA_Region = EPA_Region,
           Abbrev.Name = Abbrev.Name,
@@ -201,7 +219,7 @@ samples_epa_region_flagged <- all_data %>%
   ungroup() %>%
   unique()
 
-write_csv(samples_epa_region_flagged, 'output/figures/samples_epa_region_flagged.csv')
+write_csv(samples_epa_region_flagged, 'output/samples_epa_region_flagged.csv')
 
 
 #####Nondetects#####
@@ -219,8 +237,6 @@ ggplot(filtered_data,
   scale_y_log10(n.breaks = 6,
                 labels = label_comma(drop0trailing = TRUE)) +
   scale_color_manual(values = c("#fdae6b", "#377eb8", '#D2042D'), labels = c("Non-Detect", "Uncensored", "Ambiguous")) +
-  #geom_hline(data = data_summary_surfacewater,
-  #aes(yintercept = drinking_water), color = "#377eb8") +
   geom_hline(data=subset(data_summary_surfacewater, sample_lower_than_detection_limit_flag =="Uncensored"), 
              aes(yintercept= Min), color="#377eb8")+
   geom_hline(data = data_summary_surfacewater,
@@ -231,7 +247,7 @@ ggplot(filtered_data,
        color = "Tag") +
   theme(legend.position = "top",
         axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) #+
-#guides(color = guide_legend(nrow = 2, byrow = TRUE))
+
 ggsave('output/figures/nondetect_scatterplot.jpg', 
        height = 5, width = 8, dpi = 500)
 
@@ -256,7 +272,7 @@ ggplot(filtered_data,
        color = "Tag") +
   theme(legend.position = "top",
         axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) #+
-#guides(color = guide_legend(nrow = 2, byrow = TRUE))
+
 ggsave('output/figures/nondetect_scatterplot_flipped.jpg', 
        height = 5, width = 8, dpi = 500)
 
@@ -269,7 +285,7 @@ table_by_media <- all_data %>%
           n_samples = n()) %>%
   unique()
 
-write_csv(table_by_media, 'output/figures/table_by_media.csv')
+write_csv(table_by_media, 'output/table_by_media.csv')
 
 #####Summarize by Species#####
 table_by_species <- all_data %>%
@@ -279,10 +295,9 @@ table_by_species <- all_data %>%
           'Number of Sample' = n()) %>%
   unique()
 
-write_csv(table_by_species, 'output/figures/table_by_species.csv')
+write_csv(table_by_species, 'output/table_by_species.csv')
 
 #### Tables by state 
-
 MN_data <- all_data %>%
   filter(STATE_NAME=='Minnesota')
 WI_data <- all_data %>%
@@ -295,7 +310,7 @@ table_by_species_MN <- MN_data %>%
           'Number of Sample' = n()) %>%
   unique()
 
-write_csv(table_by_species_MN, 'output/figures/table_by_species_MN.csv')
+write_csv(table_by_species_MN, 'output/table_by_species_MN.csv')
 
 table_by_species_WI <- WI_data %>%
   filter(!is.na(SubjectTaxonomicName)) %>%
@@ -304,7 +319,7 @@ table_by_species_WI <- WI_data %>%
           'Number of Sample' = n()) %>%
   unique()
 
-write_csv(table_by_species_WI, 'output/figures/table_by_species_WI.csv')
+write_csv(table_by_species_WI, 'output/table_by_species_WI.csv')
 
 #####Summarize by State#####
 table_by_state <- all_data %>%
@@ -324,7 +339,7 @@ table_by_state_flag <- filtered_data %>%
 table_by_state_combo <- table_by_state %>%
   left_join(table_by_state_flag, by = 'STATE_NAME')
 
-write_csv(table_by_state_combo, 'output/figures/table_by_state.csv')
+write_csv(table_by_state_combo, 'output/table_by_state.csv')
 
 #####Summarize by All#####
 table_by_all <- all_data %>%
@@ -335,7 +350,7 @@ table_by_all <- all_data %>%
   unique() %>%
   arrange(STATE_NAME, ActivityMediaName)
 
-write_csv(table_by_all, 'output/figures/table_by_all.csv')
+write_csv(table_by_all, 'output/table_by_all.csv')
 
 
 #####Summarize by site by number of PFAS compounds reported & media#####
@@ -353,14 +368,13 @@ table_by_pfas_compounds <- all_data %>%
   unique()
 
 ####Boxplots####
-
 all_data_4_plot <- filtered_data %>%
   mutate(TADA.CharacteristicName = case_when(TADA.CharacteristicName == 'PERFLUOROOCTANESULFONATE' ~
                                                'PERFLUOROOCTANE SULFONIC ACID', TADA.CharacteristicName == 'PFOA ION' ~ 'PERFLUOROOCTANOIC ACID',
                                              T ~ TADA.CharacteristicName)) %>%
   filter(TADA.ResultMeasure.MeasureUnitCode != 'NONE') %>%
   mutate(TADA.ActivityMediaName = ifelse(TADA.ActivityMediaName == 'WATER', 'SURFACE WATER', TADA.ActivityMediaName))
-options(scipen=10000)
+options(scipen=9999)
 
 ggplot() + 
   geom_boxplot(data = all_data_4_plot, aes(x = Abbrev.Name, 
@@ -373,7 +387,7 @@ ggplot() +
   xlab('Characteristic Name') + 
   ylab('Sample Result Value') + 
   guides(x =guide_axis(angle = 45)) +
-  theme(text = element_text(size = 8),
+  theme(text = element_text(size = 10),
         strip.background = element_rect(fill="gray99"))
 
 ggsave('output/figures/params_by_media_boxplot.jpg', units = 'in',
@@ -381,7 +395,6 @@ ggsave('output/figures/params_by_media_boxplot.jpg', units = 'in',
 
 
 #####Jitter plot#####
-
 ggplot() +
   geom_jitter(data = all_data, aes(x = Abbrev.Name,
                                    y = TADA.ResultMeasureValue),
@@ -394,191 +407,10 @@ ggplot() +
   xlab('Characteristic Name') +
   ylab('Sample Result Value') +
   guides(x =guide_axis(angle = 45)) +
-  theme(text = element_text(size = 8),
+  theme(text = element_text(size = 10),
         strip.background = element_rect(fill="gray99"))
 
 ggsave('output/figures/params_by_media_scatter.jpg', units = 'in',
-       height = 5, width = 6)
-
-
-
-#####tissue vs concentration #####
-##make df for just MN data 
-MN_data <- all_data %>%
-  filter(STATE_NAME=='Minnesota')
-WI_data <- all_data %>%
-  filter(STATE_NAME=='Wisconsin')
-
-### ActivityStartDate ActivityStartDateTime
-
-MN_wide <- MN_data %>% 
-  pivot_wider(
-    id_cols = c(MonitoringLocationName,  CharacteristicName),
-    names_from = TADA.ActivityMediaName,
-    values_from = TADA.ResultMeasureValue,
-    #values_fn = list(ResultMeasureValue = mean),
-    values_fn=mean,
-    values_fill=NA
-  )
-
-WI_wide <- WI_data %>%
-  pivot_wider(
-   id_cols = c(MonitoringLocationName, CharacteristicName),
-    names_from = TADA.ActivityMediaName,
-    values_from = TADA.ResultMeasureValue,
-    values_fn=mean,
-    values_fill=NA
-)
-
-### MN and WI line plot 
-
-
-
-MN_fig <- ggplot(MN_wide, aes(x=WATER, y=TISSUE))+geom_point()+
-  ggtitle("Water vs Tissue at co-sampled locations in Minnesota")+
-  xlim(0,.1)+
-  xlab("Water Concentration (ug/L)")+
-  ylab("Tissue Concentration (ug/kg)")+
-  geom_smooth(method=lm)+
-  stat_poly_eq(
-    aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
-    formula = y ~ x,
-    parse = TRUE
-  )
-MN_fig
-
-ggsave('output/figures/linear_regression_MN.jpg', units = 'in',
-       height = 5, width = 6)
-
-
-WI_fig <- ggplot(WI_wide, aes(x=WATER, y=TISSUE))+geom_point()
-WI_fig
-
-##### MN and WI state box plots combined 
-
-MN_WI_data <- all_data %>%
-  filter(STATE_NAME=='Minnesota' | STATE_NAME == 'Wisconsin')
-
-MN_WI_box <- MN_WI_data %>%
-  mutate(TADA.CharacteristicName = case_when(TADA.CharacteristicName == 'PERFLUOROOCTANESULFONATE' ~
-                                               'PERFLUOROOCTANE SULFONIC ACID', TADA.CharacteristicName == 'PFOA ION' ~ 'PERFLUOROOCTANOIC ACID',
-                                             T ~ TADA.CharacteristicName)) %>%
-  filter(TADA.ResultMeasure.MeasureUnitCode != 'NONE')
-options(scipen=10000)
-
-
-
-media.labs <- c("TISSUE", "WATER")
-names(media.labs)<-c("Tissue (ug/kg)", "Water (ug/L)")
-
-state.labs <-c("Minnesota", "Wisconsin")
-names(state.labs)<-c("Minn","Wisc")
-
-
-ggplot() + 
-  geom_boxplot(data = MN_WI_box, aes(x = Abbrev.Name,
-                                  y = TADA.ResultMeasureValue)) +
-  # geom_jitter(data = all_data, aes(x = TADA.CharacteristicName, 
-  #                                  y = TADA.ResultMeasureValue)) +
-  theme_bw() +
-  scale_y_log10() +
-  facet_grid(rows = vars(STATE_NAME),
-    cols = vars(TADA.ActivityMediaName),
-    scales = 'free_y',
-    labeller = labeller(
-      TADA.ActivityMediaName=c("TISSUE"="Tissue (ug/kg)", "WATER"="Water (ug/L)")))+
-  xlab('Characteristic Name') + 
-  ylab('Sample Result Value') + 
-  guides(x =guide_axis(angle = 45)) +
-  theme(text = element_text(size = 8),
-        strip.background = element_rect(fill="gray99"))
-
-ggsave('output/figures/params_by_media_boxplot_MN_WI.jpg', units = 'in',
-       height = 5, width = 6)
-
-
-
-
-
-
-
-
-
-#### Box plots for each state
-
-
-MN_box <- MN_data %>%
-  mutate(TADA.CharacteristicName = case_when(TADA.CharacteristicName == 'PERFLUOROOCTANESULFONATE' ~
-                                               'PERFLUOROOCTANE SULFONIC ACID', TADA.CharacteristicName == 'PFOA ION' ~ 'PERFLUOROOCTANOIC ACID',
-                                             T ~ TADA.CharacteristicName)) %>%
-  filter(TADA.ResultMeasure.MeasureUnitCode != 'NONE')
-options(scipen=10000)
-
-facet_names <- list(
-  'TISSUE'="Tissue (ug/kg)",
-  'WATER'="Water (ug/L)"
-)
-
-facet_labeller <- function(variable,value){
-  return(facet_names[value])
-}
-
-
-ggplot() + 
-  geom_boxplot(data = MN_box, aes(x = Abbrev.Name,
-                                  y = TADA.ResultMeasureValue)) +
-  # geom_jitter(data = all_data, aes(x = TADA.CharacteristicName, 
-  #                                  y = TADA.ResultMeasureValue)) +
-  theme_bw() +
-  scale_y_log10() +
-  facet_grid(#rows = vars(TADA.ResultMeasure.MeasureUnitCode),
-    cols = vars(TADA.ActivityMediaName),
-    scales = 'free_y',
-    labeller=facet_labeller) + 
-  xlab('Characteristic Name') + 
-  ylab('Sample Result Value') + 
-  guides(x =guide_axis(angle = 45)) +
-  theme(text = element_text(size = 8))+
-  ggtitle('Minnesota')
-
-ggsave('output/figures/params_by_media_boxplot_MN.jpg', units = 'in',
-       height = 5, width = 6)
-
-WI_box <- WI_data %>%
-  mutate(TADA.CharacteristicName = case_when(TADA.CharacteristicName == 'PERFLUOROOCTANESULFONATE' ~
-                                               'PERFLUOROOCTANE SULFONIC ACID', TADA.CharacteristicName == 'PFOA ION' ~ 'PERFLUOROOCTANOIC ACID',
-                                             T ~ TADA.CharacteristicName)) %>%
-  filter(TADA.ResultMeasure.MeasureUnitCode != 'NONE')
-options(scipen=10000)
-
-
-facet_names <- list(
-  'TISSUE'="Tissue (ug/kg)",
-  'WATER'="Water (ug/L)"
-)
-
-facet_labeller <- function(variable,value){
-  return(facet_names[value])
-}
-
-ggplot() + 
-  geom_boxplot(data = WI_box, aes(x = Abbrev.Name, 
-                                  y = TADA.ResultMeasureValue)) +
-  # geom_jitter(data = all_data, aes(x = TADA.CharacteristicName, 
-  #                                  y = TADA.ResultMeasureValue)) +
-  theme_bw() +
-  scale_y_log10() +
-  facet_grid(#rows = vars(TADA.ResultMeasure.MeasureUnitCode),
-             cols = vars(TADA.ActivityMediaName),
-             scales = 'free_y',
-             labeller=facet_labeller) + 
-  xlab('Characteristic Name') + 
-  ylab('Sample Result Value') + 
-  guides(x =guide_axis(angle = 45)) +
-  theme(text = element_text(size = 8))+
-  ggtitle('Wisconsin')
-
-ggsave('output/figures/params_by_media_boxplot_WI.jpg', units = 'in',
        height = 5, width = 6)
 
 # code to generate sample sizes 
@@ -656,5 +488,5 @@ pie_table <- filt_pie %>%
   rename(State = STATE_NAME,
          `Total Samples` = n_samples_total)
 
-write_csv(pie_table, 'output/figures/samples_by_media_by_state.csv')
+write_csv(pie_table, 'output/samples_by_media_by_state.csv')
 
